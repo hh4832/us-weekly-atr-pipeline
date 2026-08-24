@@ -1,6 +1,6 @@
 # 美股三日 ATR Google Sheet Pipeline
 
-Version: `0.1.0`  
+Version: `0.1.1`  
 Git/GitHub 初始化請見 [`GIT_SETUP.md`](GIT_SETUP.md)。
 
 這個版本保留原本 Google Sheet 的「計算」工作表，不改寫原有市值、ETF 穿透曝險與配置公式。程式只讀取 A 欄 ticker 與 P 欄 target dollar，再建立累積性的每週計畫與 Day1–Day3 執行紀錄。
@@ -61,7 +61,9 @@ streamlit run app.py
 - 前一日未完成核對，不會產生下一日訂單。
 - Day1/Day2 空白列只有在使用者確認後才會進入下一階段。
 - Day3 仍有空白成交價時，系統拒絕完成核對。
-- 如果 calculated limit 高於或等於 10:00 參考價，訂單類型改為 MARKET；真實成交價仍由使用者填寫。
+- Day1/Day2 固定使用 LIMIT；即使當下市價低於限價，仍送出該 LIMIT 以保留最高成交價保護。
+- Day3 才使用 MARKET，真實成交價仍由使用者填寫。
+- Day1/Day2 的 `filled_price` 若高於 `limit_price` 超過 0.01，核對會被阻擋，需先檢查委託類型或輸入。
 - 第一版不處理部分成交。若實際發生，請先不要按每日核對，再增加 `filled_shares` 邏輯。
 
 ## 測試

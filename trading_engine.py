@@ -52,6 +52,15 @@ def validate_filled_prices(orders: pd.DataFrame, day: str) -> list[str]:
         errors.append("成交價必須大於 0：" + ", ".join(orders.loc[nonpositive, "ticker"]))
     if day == "Day3" and prices.isna().any():
         errors.append("Day3 為 MARKET 執行，所有列都必須填入真實成交價。")
+    if day in {"Day1", "Day2"} and "limit_price" in orders.columns:
+        limits = pd.to_numeric(orders["limit_price"], errors="coerce")
+        above_limit = prices.notna() & limits.notna() & (prices > limits + 0.01)
+        if above_limit.any():
+            errors.append(
+                "LIMIT 成交價不應高於委託限價："
+                + ", ".join(orders.loc[above_limit, "ticker"])
+                + "。請檢查是否填錯，或實際送出的是 MARKET。"
+            )
     return errors
 
 
@@ -97,9 +106,7 @@ def decide_stage(
 
 
 def choose_order_type(calculated_limit: float, current_price: float, day: str) -> str:
+    """Execution policy: preserve the price cap on Day1/Day2; guarantee completion on Day3."""
     if day == "Day3":
         return "MARKET"
-    if np.isfinite(calculated_limit) and np.isfinite(current_price) and calculated_limit >= current_price:
-        return "MARKET"
     return "LIMIT"
-

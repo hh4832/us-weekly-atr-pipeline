@@ -21,7 +21,7 @@ git branch -M main
 git add .
 git status
 git commit -m "Initial Google Sheets ATR pipeline"
-git tag -a v0.1.0 -m "First testable Google Sheets pipeline"
+git tag -a v0.1.1 -m "First testable Google Sheets pipeline with LIMIT execution"
 ```
 
 `git add .` 後必須先看 `git status`，確認憑證沒有被加入。
@@ -39,7 +39,7 @@ us-weekly-atr-pipeline
 ```powershell
 git remote add origin https://github.com/<YOUR_ACCOUNT>/us-weekly-atr-pipeline.git
 git push -u origin main
-git push origin v0.1.0
+git push origin v0.1.1
 ```
 
 ## 4. Branch 規則
@@ -81,4 +81,3 @@ test: add Day3 reconciliation cases
 - 同日重跑不會重複產生訂單
 
 全部通過後再建立 `v1.0.0`。
-

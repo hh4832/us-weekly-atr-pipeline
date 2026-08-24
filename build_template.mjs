@@ -35,7 +35,7 @@ guide.getRange("A1:F1").format = { fill: navy, font: { bold: true, color: "#FFFF
 guide.getRange("A3:B9").values = [
   ["When", "Required action"],
   ["Sunday", "Update market values, ETF weights, and target dollars in column P of the existing calculation sheet."],
-  ["Day1", "Generate orders; enter actual fills in filled_price on the execution log."],
+  ["Day1", "Generate LIMIT orders; enter actual fills in filled_price on the execution log."],
   ["After Day1", "Verify that every remaining blank truly means unfilled, then complete daily reconciliation in the app."],
   ["Day2", "Process only Day1 blanks; k = Day1 k x 0.6."],
   ["Day3", "Submit remaining orders as MARKET and still enter every actual filled_price."],
@@ -57,7 +57,7 @@ settings.getRange("A1:C7").values = [
   ["source_sheet_name", "計算", "Existing allocation sheet"],
   ["source_ticker_column", "A", "Ticker column"],
   ["source_target_column", "P", "Target-dollar column"],
-  ["market_immediate_rule", "calculated_limit >= current_price", "Switch to MARKET when true"],
+  ["day1_day2_order_type", "LIMIT", "Always preserve the maximum buy-price cap"],
   ["day2_k_multiplier", 0.6, "Day2 k = Day1 k × 0.6"],
   ["timezone", "America/New_York", "Trading-date timezone"],
 ];

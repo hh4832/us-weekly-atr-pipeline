@@ -64,10 +64,18 @@ class GoogleSheetsStore:
                 ["source_sheet_name", os.getenv("SOURCE_SHEET_NAME", "計算"), "原始配置工作表"],
                 ["source_ticker_column", os.getenv("SOURCE_TICKER_COLUMN", "A"), "ticker 欄"],
                 ["source_target_column", os.getenv("SOURCE_TARGET_COLUMN", "P"), "target dollar 欄"],
-                ["market_immediate_rule", "calculated_limit >= current_price", "符合時改為 MARKET"],
+                ["day1_day2_order_type", "LIMIT", "Day1/Day2 固定 LIMIT，保留最高成交價保護"],
                 ["day2_k_multiplier", 0.6, "Day2 k = Day1 k × 0.6"],
                 ["timezone", "America/New_York", "交易日判斷時區"],
             ], value_input_option="USER_ENTERED")
+        else:
+            values = ws.get_all_values()
+            for row_no, row in enumerate(values[1:], start=2):
+                if row and row[0] in {"market_immediate_rule", "day1_day2_order_type"}:
+                    ws.update(range_name=f"A{row_no}:C{row_no}", values=[[
+                        "day1_day2_order_type", "LIMIT", "Day1/Day2 固定 LIMIT，保留最高成交價保護",
+                    ]], value_input_option="USER_ENTERED")
+                    break
 
     def _seed_program_input(self) -> None:
         ws = self.book.worksheet("程式輸入")
