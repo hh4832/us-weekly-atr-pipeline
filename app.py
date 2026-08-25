@@ -165,7 +165,9 @@ try:
                 file_name=f"{plan_id}_{decision.stage}_export.csv",
                 mime="text/csv",
             )
-            latest = store.update_execution_manual_fields(plan_id, decision.stage)
+            # executions was already refreshed from Google Sheets at the top of this rerun.
+            # Reuse it here instead of issuing a duplicate API read.
+            latest = stage_existing.copy()
             prices = pd.to_numeric(latest["filled_price"], errors="coerce")
             blank_count = int(prices.isna().sum())
             st.warning(f"目前有 {blank_count} 檔成交價為空白。勾選後，空白列將在下一交易日進入下一階段。")

@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 import gspread
 import pandas as pd
 from google.oauth2.service_account import Credentials
+from gspread.http_client import BackOffHTTPClient
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -43,14 +44,25 @@ def _credentials() -> Credentials:
 
 class GoogleSheetsStore:
     def __init__(self, spreadsheet_id: str):
-        self.client = gspread.authorize(_credentials())
+        # BackOffHTTPClient retries transient 429/5xx responses with exponential backoff.
+        self.client = gspread.authorize(_credentials(), http_client=BackOffHTTPClient)
         self.book = self.client.open_by_key(spreadsheet_id)
+        self._worksheet_cache: dict[str, gspread.Worksheet] = {}
+
+    def worksheet(self, title: str) -> gspread.Worksheet:
+        """Reuse worksheet objects so gspread does not fetch spreadsheet metadata repeatedly."""
+        if title not in self._worksheet_cache:
+            self._worksheet_cache[title] = self.book.worksheet(title)
+        return self._worksheet_cache[title]
 
     def ensure_schema(self) -> None:
-        existing = {ws.title for ws in self.book.worksheets()}
+        worksheets = self.book.worksheets()
+        self._worksheet_cache.update({ws.title: ws for ws in worksheets})
+        existing = set(self._worksheet_cache)
         for title, headers in SHEET_HEADERS.items():
             if title not in existing:
                 ws = self.book.add_worksheet(title=title, rows=2000, cols=max(20, len(headers) + 2))
+                self._worksheet_cache[title] = ws
                 ws.append_row(headers, value_input_option="RAW")
                 ws.freeze(rows=1)
                 ws.format("1:1", {"backgroundColor": {"red": 0.09, "green": 0.33, "blue": 0.46}, "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}})
@@ -58,7 +70,7 @@ class GoogleSheetsStore:
         self._seed_program_input()
 
     def _seed_settings(self) -> None:
-        ws = self.book.worksheet("設定")
+        ws = self.worksheet("設定")
         if len(ws.get_all_values()) == 1:
             ws.append_rows([
                 ["source_sheet_name", os.getenv("SOURCE_SHEET_NAME", "計算"), "原始配置工作表"],
@@ -78,7 +90,7 @@ class GoogleSheetsStore:
                     break
 
     def _seed_program_input(self) -> None:
-        ws = self.book.worksheet("程式輸入")
+        ws = self.worksheet("程式輸入")
         if len(ws.get_all_values()) == 1:
             formulas = []
             source = os.getenv("SOURCE_SHEET_NAME", "計算")
@@ -91,7 +103,7 @@ class GoogleSheetsStore:
             ws.update(range_name="A2:C101", values=formulas, value_input_option="USER_ENTERED")
 
     def read_df(self, title: str) -> pd.DataFrame:
-        values = self.book.worksheet(title).get_all_records(default_blank="")
+        values = self.worksheet(title).get_all_records(default_blank="")
         return pd.DataFrame(values)
 
     def read_targets(self) -> pd.DataFrame:
@@ -106,7 +118,7 @@ class GoogleSheetsStore:
             return
         headers = SHEET_HEADERS[title]
         payload = [[row.get(h, "") for h in headers] for row in rows]
-        self.book.worksheet(title).append_rows(payload, value_input_option="USER_ENTERED")
+        self.worksheet(title).append_rows(payload, value_input_option="USER_ENTERED")
 
     def current_plan(self, plan_id: str) -> pd.DataFrame:
         df = self.read_df("每週計畫")
@@ -141,7 +153,7 @@ class GoogleSheetsStore:
 
     def stamp_filled_dates(self, plan_id: str, day: str, filled_date: str) -> None:
         """Fill only missing filled_date cells for rows whose user-entered filled_price is valid."""
-        ws = self.book.worksheet("執行紀錄")
+        ws = self.worksheet("執行紀錄")
         values = ws.get_all_values()
         if len(values) < 2:
             return

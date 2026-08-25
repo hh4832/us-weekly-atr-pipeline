@@ -7,6 +7,21 @@
 - 待實際走完一週 Day1–Day3 後補上修正。
 - 部分成交 `filled_shares` 邏輯尚未實作。
 
+## [0.1.4] - 2026-08-25
+
+### Fixed
+
+- 快取 Google Sheet worksheet 物件，避免每次操作都重讀 spreadsheet metadata。
+- 使用 gspread 指數退避 HTTP client，自動重試暫時性的 API 429/5xx。
+- 每次 Streamlit rerun 少做一次重複的「執行紀錄」讀取。
+
+## [0.1.3] - 2026-08-25
+
+### Fixed
+
+- 移除 `app.py` 對新版 `trading_engine.filled_price_warnings` 的啟動時匯入依賴。
+- 即使 Streamlit Cloud 更新時暫時混用舊版 `trading_engine.py`，應用程式仍可啟動並執行二次確認。
+
 ## [0.1.2] - 2026-08-25
 
 ### Changed
