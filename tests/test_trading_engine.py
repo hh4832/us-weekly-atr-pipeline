@@ -2,7 +2,13 @@ from datetime import date
 
 import pandas as pd
 
-from trading_engine import choose_order_type, decide_stage, validate_filled_prices, validate_targets
+from trading_engine import (
+    choose_order_type,
+    decide_stage,
+    filled_price_warnings,
+    validate_filled_prices,
+    validate_targets,
+)
 
 
 def test_targets_are_cleaned():
@@ -46,6 +52,12 @@ def test_day3_uses_market():
     assert choose_order_type(float("nan"), 100, "Day3") == "MARKET"
 
 
-def test_limit_fill_above_limit_is_rejected():
+def test_limit_fill_above_limit_warns_but_is_not_rejected():
     orders = pd.DataFrame([{"ticker": "NVDA", "limit_price": 100, "filled_price": 101}])
-    assert validate_filled_prices(orders, "Day1")
+    assert validate_filled_prices(orders, "Day1") == []
+    assert filled_price_warnings(orders, "Day1")
+
+
+def test_market_day_does_not_warn_about_reference_limit():
+    orders = pd.DataFrame([{"ticker": "NVDA", "limit_price": 100, "filled_price": 101}])
+    assert filled_price_warnings(orders, "Day3") == []

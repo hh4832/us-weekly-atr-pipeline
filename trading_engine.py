@@ -52,16 +52,23 @@ def validate_filled_prices(orders: pd.DataFrame, day: str) -> list[str]:
         errors.append("成交價必須大於 0：" + ", ".join(orders.loc[nonpositive, "ticker"]))
     if day == "Day3" and prices.isna().any():
         errors.append("Day3 為 MARKET 執行，所有列都必須填入真實成交價。")
+    return errors
+
+
+def filled_price_warnings(orders: pd.DataFrame, day: str) -> list[str]:
+    """Return plausible-but-unusual fills that require an explicit second confirmation."""
+    warnings: list[str] = []
     if day in {"Day1", "Day2"} and "limit_price" in orders.columns:
+        prices = pd.to_numeric(orders.get("filled_price"), errors="coerce")
         limits = pd.to_numeric(orders["limit_price"], errors="coerce")
         above_limit = prices.notna() & limits.notna() & (prices > limits + 0.01)
         if above_limit.any():
-            errors.append(
-                "LIMIT 成交價不應高於委託限價："
+            warnings.append(
+                "成交價高於程式產生時的參考限價："
                 + ", ".join(orders.loc[above_limit, "ticker"])
-                + "。請檢查是否填錯，或實際送出的是 MARKET。"
+                + "。可能是盤中調整委託價；請確認成交價記錄正確。"
             )
-    return errors
+    return warnings
 
 
 def pending_after_confirmation(orders: pd.DataFrame) -> tuple[str, ...]:

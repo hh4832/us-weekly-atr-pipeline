@@ -11,7 +11,13 @@ from dotenv import load_dotenv
 
 from google_sheets_store import GoogleSheetsStore
 from market_data import ET_TZ, k1_for, market_state, security_snapshot
-from trading_engine import choose_order_type, decide_stage, validate_filled_prices, validate_targets
+from trading_engine import (
+    choose_order_type,
+    decide_stage,
+    filled_price_warnings,
+    validate_filled_prices,
+    validate_targets,
+)
 
 load_dotenv()
 st.set_page_config(page_title="美股三日 ATR 執行 Pipeline", layout="wide")
@@ -90,6 +96,12 @@ def generate_orders(store: GoogleSheetsStore, plan: pd.DataFrame, plan_id: str, 
     return pd.DataFrame(rows)
 
 
+def save_confirmation(store: GoogleSheetsStore, plan_id: str, day: str, latest: pd.DataFrame, blank_count: int) -> None:
+    order_date = str(latest["order_date"].iloc[0])
+    store.stamp_filled_dates(plan_id, day, order_date)
+    store.confirm_day(plan_id, day, order_date, blank_count)
+
+
 try:
     store = get_store()
     plan_id = st.sidebar.text_input("本週 Plan ID", value=plan_id_for_today())
@@ -132,15 +144,36 @@ try:
             blank_count = int(prices.isna().sum())
             st.warning(f"目前有 {blank_count} 檔成交價為空白。勾選後，空白列將在下一交易日進入下一階段。")
             checked = st.checkbox("我已在 FT 核對：有成交者皆已填入 filled_price，其餘空白者確實未成交。")
-            if st.button("完成今日核對", disabled=not checked):
+            warning_key = f"confirm_warning_{plan_id}_{decision.stage}"
+            warnings = filled_price_warnings(latest, decision.stage)
+
+            if st.session_state.get(warning_key):
+                for warning in warnings:
+                    st.warning(warning)
+                confirm_exception = st.checkbox(
+                    "我已再次確認：上述成交價為真實成交價，可能因盤中調整限價或改用 MARKET。",
+                    key=f"confirm_exception_checkbox_{plan_id}_{decision.stage}",
+                )
+                if st.button("仍要完成今日核對", type="primary", disabled=not confirm_exception):
+                    errors = validate_filled_prices(latest, decision.stage)
+                    if errors:
+                        for error in errors:
+                            st.error(error)
+                    else:
+                        save_confirmation(store, plan_id, decision.stage, latest, blank_count)
+                        st.session_state.pop(warning_key, None)
+                        st.success("核對已儲存。下一個美東交易日才會進入下一階段。")
+                        st.rerun()
+            elif st.button("完成今日核對", disabled=not checked):
                 errors = validate_filled_prices(latest, decision.stage)
                 if errors:
                     for error in errors:
                         st.error(error)
+                elif warnings:
+                    st.session_state[warning_key] = True
+                    st.rerun()
                 else:
-                    order_date = str(latest["order_date"].iloc[0])
-                    store.stamp_filled_dates(plan_id, decision.stage, order_date)
-                    store.confirm_day(plan_id, decision.stage, order_date, blank_count)
+                    save_confirmation(store, plan_id, decision.stage, latest, blank_count)
                     st.success("核對已儲存。下一個美東交易日才會進入下一階段。")
                     st.rerun()
     elif decision.stage == "Completed":
