@@ -11,13 +11,7 @@ from dotenv import load_dotenv
 
 from google_sheets_store import GoogleSheetsStore
 from market_data import ET_TZ, k1_for, market_state, security_snapshot
-from trading_engine import (
-    choose_order_type,
-    decide_stage,
-    filled_price_warnings,
-    validate_filled_prices,
-    validate_targets,
-)
+from trading_engine import choose_order_type, decide_stage, validate_targets
 
 load_dotenv()
 st.set_page_config(page_title="美股三日 ATR 執行 Pipeline", layout="wide")
@@ -37,6 +31,38 @@ def plan_id_for_today() -> str:
     now = datetime.now(ZoneInfo(ET_TZ))
     iso = now.isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
+
+
+def validate_filled_prices(orders: pd.DataFrame, day: str) -> list[str]:
+    """Hard validation only; unusual LIMIT fills are handled as warnings below."""
+    errors: list[str] = []
+    prices = pd.to_numeric(orders.get("filled_price"), errors="coerce")
+    raw = orders.get("filled_price", pd.Series(index=orders.index, dtype=object))
+    invalid = raw.notna() & raw.astype(str).str.strip().ne("") & prices.isna()
+    nonpositive = prices.notna() & (prices <= 0)
+    if invalid.any():
+        errors.append("成交價必須是數字：" + ", ".join(orders.loc[invalid, "ticker"]))
+    if nonpositive.any():
+        errors.append("成交價必須大於 0：" + ", ".join(orders.loc[nonpositive, "ticker"]))
+    if day == "Day3" and prices.isna().any():
+        errors.append("Day3 為 MARKET 執行，所有列都必須填入真實成交價。")
+    return errors
+
+
+def filled_price_warnings(orders: pd.DataFrame, day: str) -> list[str]:
+    """Warnings require a second confirmation but do not block progress."""
+    warnings: list[str] = []
+    if day in {"Day1", "Day2"} and "limit_price" in orders.columns:
+        prices = pd.to_numeric(orders.get("filled_price"), errors="coerce")
+        limits = pd.to_numeric(orders["limit_price"], errors="coerce")
+        above_limit = prices.notna() & limits.notna() & (prices > limits + 0.01)
+        if above_limit.any():
+            warnings.append(
+                "成交價高於程式產生時的參考限價："
+                + ", ".join(orders.loc[above_limit, "ticker"])
+                + "。可能是盤中調整委託價；請確認成交價記錄正確。"
+            )
+    return warnings
 
 
 def create_plan(store: GoogleSheetsStore, plan_id: str) -> pd.DataFrame:
