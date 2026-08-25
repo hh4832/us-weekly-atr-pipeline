@@ -88,6 +88,7 @@ def generate_orders(store: GoogleSheetsStore, plan: pd.DataFrame, plan_id: str, 
     prior = store.executions(plan_id)
     market = market_state() if day == "Day1" else "Saved"
     rows = []
+    data_issues: list[str] = []
     for ticker in tickers:
         target = float(pd.to_numeric(plan.loc[plan["ticker"] == ticker, "target_dollar"], errors="coerce").iloc[0])
         snap = security_snapshot(ticker)
@@ -96,8 +97,21 @@ def generate_orders(store: GoogleSheetsStore, plan: pd.DataFrame, plan_id: str, 
             k_used = k1
         else:
             first = prior[(prior["ticker"] == ticker) & (prior["day"] == "Day1")]
+            if first.empty:
+                data_issues.append(f"{ticker}: 找不到 Day1 的 k1")
+                continue
             k1 = float(pd.to_numeric(first["k1"], errors="coerce").iloc[0])
             k_used = k1 * 0.6 if day == "Day2" else np.nan
+
+        required_values = (
+            {"close_y": snap["close_y"], "atr": snap["atr"], "k1": k1, "k_used": k_used}
+            if day in {"Day1", "Day2"}
+            else {"reference_price": snap["reference_price"]}
+        )
+        missing = [name for name, value in required_values.items() if not np.isfinite(value)]
+        if missing:
+            data_issues.append(f"{ticker}: " + ", ".join(missing))
+            continue
 
         if day == "Day3":
             calculated = np.nan
@@ -118,6 +132,11 @@ def generate_orders(store: GoogleSheetsStore, plan: pd.DataFrame, plan_id: str, 
             "close_y": round(snap["close_y"], 4), "atr": round(snap["atr"], 4),
             "filled_price": "", "filled_date": "", "notes": "",
         })
+    if data_issues:
+        raise ValueError(
+            "行情或前一日資料不完整，尚未寫入任何訂單。請稍後重試。缺少欄位："
+            + "；".join(data_issues)
+        )
     store.append_rows("執行紀錄", rows)
     return pd.DataFrame(rows)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +41,22 @@ def _credentials() -> Credentials:
             "或 GOOGLE_SERVICE_ACCOUNT_JSON。"
         )
     return Credentials.from_service_account_file(path, scopes=SCOPES)
+
+
+def _json_safe_cell(value: object) -> object:
+    """Convert pandas/NumPy scalars and non-finite numbers to Sheets-safe JSON values."""
+    if value is None:
+        return ""
+    try:
+        if bool(pd.isna(value)):
+            return ""
+    except (TypeError, ValueError):
+        pass
+    if hasattr(value, "item"):
+        value = value.item()
+    if isinstance(value, float) and not math.isfinite(value):
+        return ""
+    return value
 
 
 class GoogleSheetsStore:
@@ -117,7 +134,7 @@ class GoogleSheetsStore:
         if not rows:
             return
         headers = SHEET_HEADERS[title]
-        payload = [[row.get(h, "") for h in headers] for row in rows]
+        payload = [[_json_safe_cell(row.get(h, "")) for h in headers] for row in rows]
         self.worksheet(title).append_rows(payload, value_input_option="USER_ENTERED")
 
     def current_plan(self, plan_id: str) -> pd.DataFrame:

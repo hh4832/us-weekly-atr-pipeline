@@ -7,6 +7,13 @@
 - 待實際走完一週 Day1–Day3 後補上修正。
 - 部分成交 `filled_shares` 邏輯尚未實作。
 
+## [0.1.5] - 2026-08-25
+
+### Fixed
+
+- Google Sheets 寫入前將 NaN、Infinity、pandas/NumPy 空值轉成空白，避免 `InvalidJSONError`。
+- 產生訂單前檢查必要行情與 Day1 k1；資料缺失時顯示 ticker/欄位並整批停止，避免寫入不完整訂單。
+
 ## [0.1.4] - 2026-08-25
 
 ### Fixed
