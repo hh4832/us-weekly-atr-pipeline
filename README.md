@@ -1,5 +1,7 @@
 # 美股三日 ATR Google Sheet Pipeline
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/hh4832/us-weekly-atr-pipeline/blob/main/notebooks/colab_setup.ipynb)
+
 Version: `0.1.1`  
 Git/GitHub 初始化請見 [`GIT_SETUP.md`](GIT_SETUP.md)。
 
@@ -22,6 +24,18 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+## Google Colab
+
+按 README 頂端的 **Open in Colab**，即可開啟 `notebooks/colab_setup.ipynb`。Notebook 會：
+
+1. 從 GitHub `main` 重新 clone 最新程式。
+2. 安裝 `requirements.txt`。
+3. 顯示本次執行的 Git commit hash。
+4. 執行 `pytest -q` 驗證。
+5. 選擇性上傳 service account 憑證並初始化 Google Sheet。
+
+正式 Day1–Day3 操作仍建議使用 Streamlit Cloud。Colab 適合換電腦時驗證程式與必要的初始化；上傳的憑證只存在當次 Colab 工作階段，不得 commit 到 GitHub。
 
 ## Google 憑證
 
